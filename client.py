@@ -20,8 +20,8 @@ def send_message(client_socket, message_entry, text_area):
     message = message_entry.get()
     if message:
         client_socket.send(message.encode('utf-8'))
-        text_area.insert(tk.END, f"You: {message}\n")
-        text_area.see(tk.END)
+        # text_area.insert(tk.END, f"You: {message}\n")
+        # text_area.see(tk.END)
         message_entry.delete(0, tk.END)
 
 def connect_to_server(server_ip, server_port, text_area):
@@ -63,8 +63,8 @@ def create_client_gui():
 
     host_name = socket.gethostname()
     #server_ip = socket.gethostbyname(host_name)
-    server_ip = '147.185.221.23'
-    server_port = 2102
+    server_ip = '127.0.0.1'
+    server_port = 9999
     client_socket = connect_to_server(server_ip, server_port, text_area)
 
     send_button = tk.Button(window, text="Send", command=lambda: send_message(client_socket, message_entry, text_area))
