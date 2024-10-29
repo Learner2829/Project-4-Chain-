@@ -12,7 +12,6 @@ def handle_client(client_socket, address, text_area):
     text_area.insert(tk.END, f"Connection from {address}\n")
     text_area.see(tk.END)
     clients.append(client_socket)
-    broadcast(f"User {address} joined the chat.")
     update_user_count(text_area)
 
     while server_running:
@@ -22,22 +21,36 @@ def handle_client(client_socket, address, text_area):
                 text_area.insert(tk.END, f"Client {address} disconnected.\n")
                 text_area.see(tk.END)
                 clients.remove(client_socket)
-                broadcast(f"User {address} left the chat.")
                 update_user_count(text_area)
                 break
-            text_area.insert(tk.END, f"Message from {address}: {message}\n")
-            text_area.see(tk.END)
-            broadcast(f"Message from {address}: {message}")
+            
+            # Check if the message is a request for the room list
+            if message.startswith("FETCH_ROOM_LIST"):
+                _, u_id, u_name = message.split("|")
+                text_area.insert(tk.END, f"Received room list request from user {u_name} ({u_id}).\n")
+                text_area.see(tk.END)
+                send_room_list(client_socket)  # Send room list to this client
+            else:
+                text_area.insert(tk.END, f"Message from {address}: {message}\n")
+                text_area.see(tk.END)
+                broadcast(f"Message from {address}: {message}")
         except Exception as e:
             text_area.insert(tk.END, f"Error receiving message from {address}: {e}\n")
             text_area.insert(tk.END, f"Client {address} disconnected.\n")
             text_area.see(tk.END)
             clients.remove(client_socket)
-            broadcast(f"User {address} left the chat.")
             update_user_count(text_area)
             break
 
     client_socket.close()
+
+def send_room_list(client_socket):
+    # Define a sample room list
+    room_list = "Technology|Gaming|Education|Memes"
+    try:
+        client_socket.send(room_list.encode('utf-8'))
+    except Exception as e:
+        print(f"Error sending room list to client: {e}")
 
 def broadcast(message):
     for client in clients:
