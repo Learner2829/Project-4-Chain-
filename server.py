@@ -2,6 +2,7 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import scrolledtext
+import db
 
 # Global variables to control the server state and store client connections
 server_running = True
@@ -31,9 +32,17 @@ def handle_client(client_socket, address, text_area):
                 text_area.see(tk.END)
                 send_room_list(client_socket)  # Send room list to this client
             else:
-                text_area.insert(tk.END, f"Message from {address}: {message}\n")
+                # Extract room, u_name from message
+                parts = message.split(":", 2)
+                if len(parts) == 3:
+                    room = parts[0]
+                    u_name = parts[1]
+                    t_message = parts[2]
+                    text_area.insert(tk.END, f"[ {u_name} ]:{t_message}\n")
+                    # message = t_message
+                # text_area.insert(tk.END, f"Message from {address}: {message}\n")
                 text_area.see(tk.END)
-                broadcast(f"Message from {address}: {message}")
+                broadcast(f"{message}")
         except Exception as e:
             text_area.insert(tk.END, f"Error receiving message from {address}: {e}\n")
             text_area.insert(tk.END, f"Client {address} disconnected.\n")
@@ -44,9 +53,11 @@ def handle_client(client_socket, address, text_area):
 
     client_socket.close()
 
+
 def send_room_list(client_socket):
     # Define a sample room list
-    room_list = "Technology|Gaming|Education|Memes"
+    connection = db.check_database_connection()
+    room_list = db.get_all_groups(connection)
     try:
         client_socket.send(room_list.encode('utf-8'))
     except Exception as e:
@@ -55,7 +66,14 @@ def send_room_list(client_socket):
 def broadcast(message):
     for client in clients:
         try:
-            client.send(message.encode('utf-8'))
+            if len(message) == 3:
+                u_parts = message.split(":", 2)
+                t_message = f"[{u_parts[1]}:{u_parts[2]}]"
+                client.send(t_message.encode('utf-8'))
+            else:
+                u_parts = message.split(":", 2)
+                t_message = f"[{u_parts[1]}]:{u_parts[2]}"
+                client.send(t_message.encode('utf-8'))
         except Exception as e:
             print(f"Error sending message to client: {e}")
 
@@ -105,8 +123,9 @@ def stop_server(text_area):
 
 def send_message_to_clients(message, text_area, message_entry):
     if message:
-        broadcast(f"Server: {message}")
-        text_area.insert(tk.END, f"Server: {message}\n")
+        message =f'Server:Server:{message}'
+        broadcast(f"{message}")
+        text_area.insert(tk.END, f"{message}\n")
         text_area.see(tk.END)
         message_entry.delete(0, tk.END)
 

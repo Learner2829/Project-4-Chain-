@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import scrolledtext, simpledialog, messagebox
 import uuid  # Import the uuid module for generating random user IDs
 
+
 def receive_messages(client_socket, text_area):
     while True:
         try:
@@ -17,11 +18,12 @@ def receive_messages(client_socket, text_area):
             text_area.see(tk.END)
             break
 
-def send_message(client_socket, message_entry, text_area, username):
+def send_message(client_socket, message_entry, text_area, username, room_name):
     message = message_entry.get()
     if message:
         try:
-            full_message = f"{username}: {message}"
+            # Combine room_name, username, and message as required
+            full_message = f"{room_name}:{username}:{message}"
             client_socket.send(full_message.encode('utf-8'))
         except Exception as e:
             text_area.insert(tk.END, f"Error sending message: {e}\n")
@@ -31,8 +33,10 @@ def send_message(client_socket, message_entry, text_area, username):
 def connect_to_server(server_ip, server_port, text_area, username, room_name):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
+        message = "I Am Live"
         client_socket.connect((server_ip, server_port))
-        client_socket.send(room_name.encode('utf-8'))  # Send selected room name to the server
+        full_message = f"{room_name}:{username}:{message}"
+        client_socket.send(full_message.encode('utf-8'))  # Send selected room name to the server
         text_area.insert(tk.END, f"Connected to the server as {username} in room '{room_name}'.\n")
         text_area.see(tk.END)
         
@@ -105,7 +109,7 @@ def choose_room_gui(window, server_ip, server_port, u_id, u_name, callback):
 
 def create_client_gui():
     window = tk.Tk()
-    window.title("Client")
+    window.title("4-Chain")
     window.geometry("600x600")
 
     current_theme = ['light']
@@ -133,7 +137,7 @@ def create_client_gui():
         server_port = 9999
         client_socket = connect_to_server(server_ip, server_port, text_area, username, room_name)
 
-        send_button = tk.Button(window, text="Send", command=lambda: send_message(client_socket, message_entry, text_area, username))
+        send_button = tk.Button(window, text="Send", command=lambda: send_message(client_socket, message_entry, text_area, username, room_name))
         send_button.pack(pady=5)
 
         theme_button = tk.Button(window, text="Toggle Theme", command=lambda: toggle_theme(window, text_area, message_entry, current_theme))

@@ -149,15 +149,34 @@ def entry_message(connection, u_id, message, g_id):
     except Error as e:
         print(f"Error: {e}")
 
+def get_all_groups(connection):
+    try:
+        cursor = connection.cursor()
+        
+        # SQL query to fetch all group names from the groups table
+        fetch_query = "SELECT g_name FROM group_data"
+        cursor.execute(fetch_query)
+        
+        # Fetch all group names
+        groups = cursor.fetchall()
+        
+        # Convert the group names to a single string separated by '|'
+        group_string = '|'.join([group[0] for group in groups])
+        
+        return group_string
+
+    except Error as e:
+        print(f"Error: {e}")
+        return None
+    finally:
+        cursor.close()
+
 # Example usage of entry_message
-    
-
-    
-
-
-# connection = check_database_connection()
+connection = check_database_connection()
+# str= get_all_groups(connection)
+# print(str)
 # create_user(connection,2, 102, 'Doe')
-# create_group(connection,103,'KS',0)
+# create_group(connection,103,'LD',0)
 # delete_group(connection,103,'KS')
 # entry_message(connection, 2, "Hello, this is a test message!", 103)
 
