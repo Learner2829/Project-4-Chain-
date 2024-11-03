@@ -1,6 +1,7 @@
 import socket
 import threading
 import tkinter as tk
+from tkinter import simpledialog
 from tkinter import scrolledtext
 import db
 
@@ -8,6 +9,7 @@ import db
 server_running = True
 server_socket = None
 clients = []
+
 
 def handle_client(client_socket, address, text_area):
     text_area.insert(tk.END, f"Connection from {address}\n")
@@ -39,8 +41,16 @@ def handle_client(client_socket, address, text_area):
                     u_name = parts[1]
                     t_message = parts[2]
                     text_area.insert(tk.END, f"[ {u_name} ]:{t_message}\n")
-                    # message = t_message
-                # text_area.insert(tk.END, f"Message from {address}: {message}\n")
+                    
+                    connection = db.check_database_connection()
+                    if db.is_user_present(connection,u_name, db.get_group_id(connection, room)) == True:
+                        db.entry_message(connection, u_name, t_message, db.get_group_id(connection, room))
+                        # pass
+                    else:
+                        connection = db.check_database_connection()
+                        db.create_user(connection, db.get_group_id(connection, room),u_name)
+                        db.entry_message(connection, u_name, t_message, db.get_group_id(connection, room))
+                    
                 text_area.see(tk.END)
                 broadcast(f"{message}")
         except Exception as e:
@@ -79,8 +89,8 @@ def broadcast(message):
 
 def update_user_count(text_area):
     online_count = len(clients)
-    text_area.insert(tk.END, f"Online users: {online_count}\n")
-    text_area.see(tk.END)
+    # text_area.insert(tk.END, f"Online users: {online_count}\n")
+    # text_area.see(tk.END)
 
 def start_server(text_area):
     global server_socket
@@ -141,10 +151,26 @@ def toggle_theme(window, text_area, message_entry, current_theme):
         message_entry.config(bg='white', fg='black', insertbackground='black')
         current_theme[0] = 'light'
 
+def create_chat_room(text_area):
+    # Prompt for the new chat room name
+    room_name = simpledialog.askstring("New Chat Room", "Enter the name of the new chat room:")
+    
+    if room_name:
+        # Here you would include the logic to create the chat room in your application
+        # For example, adding the room to your database or server management
+        connection = db.check_database_connection()
+        if db.create_group(connection,room_name,0):
+            text_area.insert(tk.END, f"Chat room '{room_name}' created successfully.\n")
+            text_area.see(tk.END)
+        else:
+            text_area.insert(tk.END, f"Chat room '{room_name}' Not created!!!.\n")
+            text_area.see(tk.END)
+
+
 def create_gui():
     window = tk.Tk()
     window.title("Server")
-    window.geometry("700x500")
+    window.geometry("850x500")
 
     current_theme = ['light']
 
@@ -165,6 +191,11 @@ def create_gui():
 
     theme_button = tk.Button(window, text="Toggle Theme", command=lambda: toggle_theme(window, text_area, message_entry, current_theme))
     theme_button.pack(side=tk.RIGHT, padx=10, pady=10)
+
+    # Button to create a new chat room
+    create_room_button = tk.Button(window, text="Create Chat Room", command=lambda: create_chat_room(text_area))
+    create_room_button.pack(side=tk.LEFT, padx=10, pady=10)
+    
 
     window.mainloop()
 
