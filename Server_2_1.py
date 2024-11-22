@@ -38,8 +38,6 @@ def send_all_message_to_client(client_socket, room_name):
         print(f"Error sending all messages to client: {e}")
         client_socket.send(f"Error: {e}".encode('utf-8'))
 
-
-
 def handle_client(client_socket, address, text_area):
     text_area.insert(tk.END, f"Connection from {address}\n")
     text_area.see(tk.END)
@@ -65,34 +63,49 @@ def handle_client(client_socket, address, text_area):
                 _, u_id, u_name = message.split("|")
                 text_area.insert(tk.END, f"Received room list request from user {u_name} ({u_id}).\n")
                 text_area.see(tk.END)
-                send_room_list(client_socket)  # Send room list to this client
+                send_room_list(client_socket)
+                  # Send room list to this client
             else:
-                # Extract room and user details from the message
-                parts = message.split(":", 2)
+                # Extract room, user details, and optionally timestamp from the message
+                parts = message.split(":", 3)
+                
                 if len(parts) == 3:
-                    room = parts[0]
-                    u_name = parts[1]
-                    t_message = parts[2]
-                    text_area.insert(tk.END, f"[ {u_name} ]: {t_message}\n")
-                    
-                    # Ensure the room exists in client_groups
-                    if room not in client_groups:
-                        client_groups[room] = []
-                    
-                    # Add the client to the group if not already added
-                    if client_socket not in client_groups[room]:
-                        client_groups[room].append(client_socket)
-                    
-                    # Save the message to the database if user is present
-                    connection = db.check_database_connection()
-                    if db.is_user_present(connection, u_name, db.get_group_id(connection, room)):
-                        db.entry_message(connection, u_name, t_message, db.get_group_id(connection, room))
-                    else:
-                        db.create_user(connection, db.get_group_id(connection, room), u_name)
-                        db.entry_message(connection, u_name, t_message, db.get_group_id(connection, room))
+                    # Handle the case where the timestamp is not provided
+                    room, u_name, t_message = parts
+                    timestamp = None  # No timestamp provided
+                elif len(parts) == 4:
+                    # Handle the case where the timestamp is provided
+                    room, u_name, t_message, timestamp = parts
+                else:
+                    # Invalid message format
+                    text_area.insert(tk.END, f"Invalid message format from {address}: {message}\n")
+                    text_area.see(tk.END)
+                    continue
 
-                    # Broadcast message to the specified group
-                    broadcast(f"{room}:{u_name}:{t_message}", room)
+                # Log the message
+                if timestamp:
+                    text_area.insert(tk.END, f"[{timestamp}] [ {u_name} ]: {t_message}\n")
+                else:
+                    text_area.insert(tk.END, f"[ {u_name} ]: {t_message}\n")
+
+                # Ensure the room exists in client_groups
+                if room not in client_groups:
+                    client_groups[room] = []
+                
+                # Add the client to the group if not already added
+                if client_socket not in client_groups[room]:
+                    client_groups[room].append(client_socket)
+                
+                # Save the message to the database if user is present
+                connection = db.check_database_connection()
+                if db.is_user_present(connection, u_name, db.get_group_id(connection, room)):
+                    db.entry_message(connection, u_name, t_message, db.get_group_id(connection, room), timestamp)
+                else:
+                    db.create_user(connection, db.get_group_id(connection, room), u_name)
+                    db.entry_message(connection, u_name, t_message, db.get_group_id(connection, room), timestamp)
+
+                # Broadcast message to the specified group
+                broadcast(f"{room}:{u_name}:{t_message}:{timestamp}" if timestamp else f"{room}:{u_name}:{t_message}", room)
                 
                 text_area.see(tk.END)
 
@@ -126,16 +139,27 @@ def broadcast(message, room=None):
         for client in client_groups[room]:
             try:
                 # Safely split message into parts and ensure there are enough parts
-                parts_b = message.split(":", 2)
+                parts_b = message.split(":", 3)  # Allow splitting into 4 parts for the timestamp
                 if len(parts_b) < 3:
-                    print("Invalid message format. Expected format: room:username:message")
+                    print("Invalid message format. Expected format: room:username:message[:timestamp]")
                     continue
 
-                # Format the message to display the sender's name and message content
-                formatted_message = f"[{parts_b[1]}]: {parts_b[2]}"
+                # Extract message components
+                sender = parts_b[1]
+                content = parts_b[2]
+                timestamp = parts_b[3] if len(parts_b) == 4 else None  # Check if timestamp is provided
+
+                # Format the message for broadcasting
+                if timestamp:
+                    formatted_message = f"[{sender}] [{timestamp}]: {content}"
+                else:
+                    formatted_message = f"[{sender}]: {content}"
+
+                # Send the formatted message to the client
                 client.send(formatted_message.encode('utf-8'))
             except Exception as e:
                 print(f"Error sending message to client in {room}: {e}")
+
 
 def update_user_count(text_area):
     online_count = len(clients)

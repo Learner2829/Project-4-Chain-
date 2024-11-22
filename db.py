@@ -1,5 +1,6 @@
 import mysql.connector
 from mysql.connector import Error
+from datetime import datetime
 
 def check_database_connection():
     try:
@@ -67,6 +68,7 @@ def create_group(connection, g_name, ex_token):
             u_id INT,
             message TEXT,
             g_id INT,
+            m_datetime DATETIME,
             FOREIGN KEY (g_id) REFERENCES group_data(g_id)
         )
         """
@@ -118,8 +120,7 @@ def delete_group(connection, g_id, g_name):
     except Error as e:
         print(f"Delete_group_Error: {e}")
 
-
-def entry_message(connection, u_name, message, g_id):
+def entry_message(connection, u_name, message, g_id, m_datetime=None):
     try:
         cursor = connection.cursor()
 
@@ -144,52 +145,25 @@ def entry_message(connection, u_name, message, g_id):
         g_name = group[0]
         message_table_name = f"{g_name}_message"
 
-        # SQL query to insert a new message
+        # If m_datetime is not provided, use the current timestamp
+        if m_datetime is None:
+            m_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Use current datetime if m_datetime is not passed
+
+        # SQL query to insert a new message with the timestamp (m_datetime)
         insert_query = f"""
-        INSERT INTO `{message_table_name}` (u_id, message, g_id)
-        VALUES (%s, %s, %s)
+        INSERT INTO `{message_table_name}` (u_id, message, g_id, m_datetime)
+        VALUES (%s, %s, %s, %s)
         """
 
         # Execute the query with the provided arguments
-        cursor.execute(insert_query, (u_id, message, g_id))
+        cursor.execute(insert_query, (u_id, message, g_id, m_datetime))
 
         # Commit the transaction
         connection.commit()
-        # print(f"Message from user {u_name} added successfully to group {g_name}.")
+        print(f"Message from user {u_name} added successfully to group {g_name} with timestamp {m_datetime}.")
 
     except Error as e:
         print(f"Message_Error: {e}")
-
-# def entry_message(connection, u_id, message, g_id):
-#     try:
-#         cursor = connection.cursor()
-
-#         # Retrieve the group name based on g_id to determine the message table
-#         cursor.execute("SELECT g_name FROM group_data WHERE g_id = %s", (g_id,))
-#         group = cursor.fetchone()
-
-#         if group is None:
-#             print(f"No group found with ID {g_id}.")
-#             return
-        
-#         g_name = group[0]
-#         message_table_name = f"{g_name}_message"
-
-#         # SQL query to insert a new message
-#         insert_query = f"""
-#         INSERT INTO `{message_table_name}` (u_id, message, g_id)
-#         VALUES (%s, %s, %s)
-#         """
-
-#         # Execute the query with the provided arguments
-#         cursor.execute(insert_query, (u_id, message, g_id))
-
-#         # Commit the transaction
-#         connection.commit()
-#         print(f"Message from user {u_id} added successfully to group {g_name}.")
-
-#     except Error as e:
-#         print(f"Error: {e}")
 
 def get_all_groups(connection):
     try:
@@ -243,8 +217,6 @@ def is_user_present(connection, u_name, g_id):
         print(f"User_check_error_Error: {e}")
         return False
 
-
-
 def get_group_id(connection, g_name):
     try:
         cursor = connection.cursor()
@@ -273,8 +245,42 @@ def get_group_id(connection, g_name):
         print(f"group_id_Error: {e}")
         return None
 
+def fetch_all_messages(connection, room_name):
+    try:
+        cursor = connection.cursor()
+
+        # Dynamically generate the table name based on the room name
+        message_table_name = f"{room_name}_message"
+
+        # SQL query to fetch all messages from the room's message table
+        select_query = f"""
+        SELECT m_id, u_id, message, m_datetime,g_id 
+        FROM `{message_table_name}`
+        ORDER BY m_datetime ASC 
+        """
+
+        cursor.execute(select_query)
+
+        # Fetch all results
+        messages = cursor.fetchall()
+
+        # Return the fetched messages (list of tuples)
+        return messages
+
+    except Error as e:
+        print(f"Error fetching messages from {room_name}: {e}")
+        return None
+
+
 # Example usage of entry_message
-# connection = check_database_connection()
+connection = check_database_connection()
+messages = fetch_all_messages(connection,"test")
+
+if messages:
+    for message in messages:
+        print(f"group ID:{message[4]} Message ID: {message[0]}, User ID: {message[1]}, Message: {message[2]}, Timestamp: {message[3]}")
+else:
+    print("No messages found or error occurred.")
 # print(get_group_id(connection,"KS"))
 # print(is_user_present(connection,"Aku",104))
 # str= get_all_groups(connection)
