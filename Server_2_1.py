@@ -4,6 +4,9 @@ import tkinter as tk
 from tkinter import simpledialog
 from tkinter import scrolledtext
 import db
+from datetime import datetime
+import time
+from datetime import datetime, timedelta 
 
 # Global variables to control the server state and store client connections
 server_running = True
@@ -11,32 +14,55 @@ server_socket = None
 clients = []
 client_groups = {}  # Dictionary to track clients by group {group_name: [client_socket, ...]}
 
-def send_all_message_to_client(client_socket, room_name):
-    try:
-        # Establish a database connection
-        connection = db.check_database_connection()
+def start_stopwatch(text_area):
+    """
+    Starts a stopwatch that updates the text_area every second.
+    This function runs until the server is stopped.
+    """
+    start_time = time.time()  # Get the start time
 
-        # Fetch all messages for the room from the database
-        messages = db.fetch_all_messages(connection, room_name)
+    def update_stopwatch():
+        while server_running:
+            try:
+                elapsed_time = time.time() - start_time  # Time elapsed since start
+                minutes, seconds = divmod(elapsed_time, 60)  # Divide by 60 to get minutes and seconds
+                hours, minutes = divmod(minutes, 60)  # Divide by 60 again to get hours
 
-        if messages:
-            for message in messages:
-                m_id, u_id, msg, m_datetime,g_id = message  # Unpack the message tuple
-                
-                # You can format the message before sending
-                formatted_message = f"Message ID: {m_id}, User ID: {u_id}, Message: {msg}, Timestamp: {m_datetime}"
-                
-                # Send the formatted message to the client
-                client_socket.send(formatted_message.encode('utf-8'))
+                # Format time as hh:mm:ss
+                formatted_time = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
 
-            # Optionally, send a special message indicating the end of the message stream
-            client_socket.send("END_OF_OLD_MESSAGES".encode('utf-8'))
-        else:
-            client_socket.send("No messages found in this room.".encode('utf-8'))
+                # Update the text_area with the formatted time
+                text_area.delete(1.0, tk.END)  # Clear previous time
+                text_area.insert(tk.END, f"Stopwatch: {formatted_time}\n")  # Insert new time
+                text_area.see(tk.END)  # Scroll to the latest entry
+            except Exception as e:
+                print(f"Error updating stopwatch: {e}")
+            time.sleep(1)  # Update every second
 
-    except Exception as e:
-        print(f"Error sending all messages to client: {e}")
-        client_socket.send(f"Error: {e}".encode('utf-8'))
+    # Start the stopwatch in a separate thread to avoid blocking the main GUI
+    stopwatch_thread = threading.Thread(target=update_stopwatch)
+    stopwatch_thread.daemon = True
+    stopwatch_thread.start()
+
+def schedule_message_cleanup():
+    """
+    Automatically deletes messages older than 10 minutes from the database.
+    This function runs in a loop and executes every 10 minutes.
+    """
+    while server_running:
+        try:
+            current_time = datetime.now()
+            threshold_time = current_time - timedelta(minutes=10)
+            connection = db.check_database_connection()
+            
+            # Call the cleanup function in db.py with the threshold time
+            db.delete_old_messages(connection, threshold_time)
+            print(f"Cleaned up messages older than {threshold_time}")
+        except Exception as e:
+            print(f"Error in message cleanup: {e}")
+        
+        # Sleep for 10 minutes before running the cleanup again
+        time.sleep(600)  # 600 seconds = 10 minutes
 
 def handle_client(client_socket, address, text_area):
     text_area.insert(tk.END, f"Connection from {address}\n")
@@ -84,7 +110,7 @@ def handle_client(client_socket, address, text_area):
 
                 # Log the message
                 if timestamp:
-                    text_area.insert(tk.END, f"[{timestamp}] [ {u_name} ]: {t_message}\n")
+                    text_area.insert(tk.END, f"[ {u_name} ]  [{timestamp}] : {t_message}\n")
                 else:
                     text_area.insert(tk.END, f"[ {u_name} ]: {t_message}\n")
 
@@ -110,7 +136,6 @@ def handle_client(client_socket, address, text_area):
                 text_area.see(tk.END)
 
         except Exception as e:
-            text_area.insert(tk.END, f"Error receiving message from {address}: {e}\n")
             text_area.insert(tk.END, f"Client {address} disconnected.\n")
             text_area.see(tk.END)
             clients.remove(client_socket)
@@ -159,8 +184,32 @@ def broadcast(message, room=None):
                 client.send(formatted_message.encode('utf-8'))
             except Exception as e:
                 print(f"Error sending message to client in {room}: {e}")
+# Global broadcast to all clients in all groups if room is "Server"
+    if room == "Server":
+        for group, group_clients in client_groups.items():
+            for client in group_clients:
+                try:
+                    # Format the message to indicate it is from the server
+                    parts_b = message.split(":", 2)  # Allow splitting into 4 parts for the timestamp
+                    if len(parts_b) < 2:
+                        print("Invalid message format. Expected format: room:username:message[:timestamp]")
+                        continue
 
+                    sender = parts_b[0]
+                    content = parts_b[1]
+                    timestamp = parts_b[2]   # Check if timestamp is provided
 
+                    # Format the message for broadcasting
+                    if timestamp:
+                        formatted_message = f"[Server] [{timestamp}]: {content}"
+                    else:
+                        formatted_message = f"[Server]: {content}"
+
+                    # Send the formatted message to the client
+                    client.send(formatted_message.encode('utf-8'))
+                except Exception as e:
+                    print(f"Error sending message to client in group {group}: {e}")
+        return  # Exit after global broadcasting
 def update_user_count(text_area):
     online_count = len(clients)
     # text_area.insert(tk.END, f"Online users: {online_count}\n")
@@ -197,6 +246,11 @@ def start_server_thread(text_area):
     server_thread.daemon = True
     server_thread.start()
 
+    # Start the cleanup scheduler thread
+    cleanup_thread = threading.Thread(target=schedule_message_cleanup)
+    cleanup_thread.daemon = True
+    cleanup_thread.start()
+
 def stop_server(text_area):
     global server_running, server_socket
     server_running = False
@@ -207,8 +261,9 @@ def stop_server(text_area):
 
 def send_message_to_clients(message, text_area, message_entry):
     if message:
-        message =f'Server:Server:{message}'
-        broadcast(f"{message}")
+        current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        message =f'Server:{message}:{current_datetime}'
+        broadcast(f"{message}","Server")
         text_area.insert(tk.END, f"{message}\n")
         text_area.see(tk.END)
         message_entry.delete(0, tk.END)
@@ -243,7 +298,7 @@ def create_chat_room(text_area):
 
 def create_gui():
     window = tk.Tk()
-    window.title("Server")
+    window.title("4-Chain Server Room")
     window.geometry("850x500")
 
     current_theme = ['light']
@@ -265,6 +320,9 @@ def create_gui():
 
     theme_button = tk.Button(window, text="Toggle Theme", command=lambda: toggle_theme(window, text_area, message_entry, current_theme))
     theme_button.pack(side=tk.RIGHT, padx=10, pady=10)
+
+    # Start the timer to update every 10 minutes
+    # start_stopwatch(text_area)
 
     # Button to create a new chat room
     create_room_button = tk.Button(window, text="Create Chat Room", command=lambda: create_chat_room(text_area))

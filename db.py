@@ -14,7 +14,7 @@ def check_database_connection():
         
         # Check if the connection was successful
         if connection.is_connected():
-            print("Connected to the database.")
+            # print("Connected to the database.")
             return connection
 
     except Error as e:
@@ -245,48 +245,58 @@ def get_group_id(connection, g_name):
         print(f"group_id_Error: {e}")
         return None
 
-def fetch_all_messages(connection, room_name):
+
+def delete_old_messages(connection, cutoff_time):
+    """
+    Deletes messages older than the given cutoff_time from all group message tables.
+
+    Args:
+        connection: Database connection object.
+        cutoff_time: A datetime object specifying the cutoff time.
+    """
     try:
         cursor = connection.cursor()
 
-        # Dynamically generate the table name based on the room name
-        message_table_name = f"{room_name}_message"
+        # Fetch all group names from the group_data table
+        cursor.execute("SELECT g_id, g_name FROM group_data")
+        groups = cursor.fetchall()  # List of (g_id, g_name) tuples
 
-        # SQL query to fetch all messages from the room's message table
-        select_query = f"""
-        SELECT m_id, u_id, message, m_datetime,g_id 
-        FROM `{message_table_name}`
-        ORDER BY m_datetime ASC 
-        """
+        for g_id, g_name in groups:
+            message_table_name = f"{g_name}_message"
 
-        cursor.execute(select_query)
+            # Delete messages older than the cutoff_time
+            delete_query = f"DELETE FROM `{message_table_name}` WHERE m_datetime < %s"
+            cursor.execute(delete_query, (cutoff_time,))
 
-        # Fetch all results
-        messages = cursor.fetchall()
+        # Commit changes to the database
+        connection.commit()
+        print(f"Deleted messages older than {cutoff_time}.")
 
-        # Return the fetched messages (list of tuples)
-        return messages
+    except Exception as e:
+        print(f"Error in delete_old_messages: {e}")
+        raise  # Rethrow the exception for the caller to handle
 
-    except Error as e:
-        print(f"Error fetching messages from {room_name}: {e}")
-        return None
+    finally:
+        # Close the cursor
+        if cursor:
+            cursor.close()
 
 
 # Example usage of entry_message
 connection = check_database_connection()
-messages = fetch_all_messages(connection,"test")
+# messages = fetch_all_messages(connection,"test")
 
-if messages:
-    for message in messages:
-        print(f"group ID:{message[4]} Message ID: {message[0]}, User ID: {message[1]}, Message: {message[2]}, Timestamp: {message[3]}")
-else:
-    print("No messages found or error occurred.")
+# if messages:
+#     for message in messages:
+#         print(f"group ID:{message[4]} Message ID: {message[0]}, User ID: {message[1]}, Message: {message[2]}, Timestamp: {message[3]}")
+# else:
+#     print("No messages found or error occurred.")
 # print(get_group_id(connection,"KS"))
 # print(is_user_present(connection,"Aku",104))
 # str= get_all_groups(connection)
 # print(str)
 # create_user(connection,2, 102, 'Doe')
 # create_group(connection,103,'LD',0)
-# delete_group(connection,103,'KS')
+# delete_group(connection,106,'Dark_room')
 # entry_message(connection, 'Roy', "Hello, this is a test message!", 103)
 

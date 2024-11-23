@@ -2,8 +2,9 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import scrolledtext, simpledialog, messagebox
-import uuid  # Import the uuid module for generating random user IDs
+import uuid  
 from datetime import datetime
+
 
 def receive_messages(client_socket, text_area):
     while True:
@@ -14,13 +15,32 @@ def receive_messages(client_socket, text_area):
             text_area.insert(tk.END, f"{message}\n")
             text_area.see(tk.END)
         except Exception as e:
-            text_area.insert(tk.END, f"Error: {e}\n")
+            text_area.insert(tk.END, f"Server is Disconnected...\n")
             text_area.see(tk.END)
             break
+
+def validate_message(message):
+    """
+    Validates the user message by replacing forbidden words with "***".
+    Forbidden words: "Server", ":"
+    
+    Args:
+        message (str): The user input message.
+    
+    Returns:
+        str: The sanitized message.
+    """
+    # Replace forbidden words with "***"
+    forbidden_words = [":"]
+    for word in forbidden_words:
+        message = message.replace(word, "*")
+    return message
 
 def send_message(client_socket, message_entry, text_area, username, room_name):
     message = message_entry.get()
     if message:
+        # Validate the message before sending
+        message = validate_message(message)
         try:
             # Get the current timestamp in the desired format
             current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -31,7 +51,7 @@ def send_message(client_socket, message_entry, text_area, username, room_name):
             # Send the full message to the server, including the timestamp
             client_socket.send(full_message.encode('utf-8'))
         except Exception as e:
-            text_area.insert(tk.END, f"Error sending message: {e}\n")
+            text_area.insert(tk.END, f"Server is Disconnected...\n")
             text_area.see(tk.END)
 
         # Clear the message entry field
@@ -51,7 +71,7 @@ def connect_to_server(server_ip, server_port, text_area, username, room_name):
         receive_thread.daemon = True
         receive_thread.start()
     except Exception as e:
-        messagebox.showerror("Connection Error", str(e))
+        messagebox.showerror("Connection Error.....")
         client_socket.close()
         return None
     
@@ -140,8 +160,8 @@ def create_client_gui():
         message_entry = tk.Entry(window)
         message_entry.pack(fill='x', padx=10, pady=5)
 
-        server_ip = '127.0.0.1'
-        server_port = 9999
+        server_ip = "147.185.221.24"
+        server_port = 3535
         client_socket = connect_to_server(server_ip, server_port, text_area, username, room_name)
 
         send_button = tk.Button(window, text="Send", command=lambda: send_message(client_socket, message_entry, text_area, username, room_name))
@@ -153,8 +173,8 @@ def create_client_gui():
         window.protocol("WM_DELETE_WINDOW", lambda: on_closing(client_socket, window))
 
     # Open room selection window
-    server_ip = '127.0.0.1'
-    server_port = 9999
+    server_ip = "147.185.221.24"
+    server_port = 3535
     choose_room_gui(window, server_ip, server_port, u_id, username, start_chat_in_room)
 
     window.mainloop()

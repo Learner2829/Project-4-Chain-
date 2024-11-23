@@ -11,34 +11,6 @@ server_socket = None
 clients = []
 client_groups = {}  # Dictionary to track clients by group {group_name: [client_socket, ...]}
 
-def send_all_message_to_client(client_socket, room_name):
-    try:
-        # Establish a database connection
-        connection = db.check_database_connection()
-
-        # Fetch all messages for the room from the database
-        messages = db.fetch_all_messages(connection, room_name)
-
-        if messages:
-            for message in messages:
-                m_id, u_id, msg, m_datetime,g_id = message  # Unpack the message tuple
-                
-                # You can format the message before sending
-                formatted_message = f"Message ID: {m_id}, User ID: {u_id}, Message: {msg}, Timestamp: {m_datetime}"
-                
-                # Send the formatted message to the client
-                client_socket.send(formatted_message.encode('utf-8'))
-
-            # Optionally, send a special message indicating the end of the message stream
-            client_socket.send("END_OF_OLD_MESSAGES".encode('utf-8'))
-        else:
-            client_socket.send("No messages found in this room.".encode('utf-8'))
-
-    except Exception as e:
-        print(f"Error sending all messages to client: {e}")
-        client_socket.send(f"Error: {e}".encode('utf-8'))
-
-
 
 def handle_client(client_socket, address, text_area):
     text_area.insert(tk.END, f"Connection from {address}\n")

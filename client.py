@@ -133,8 +133,8 @@ def create_client_gui():
         message_entry = tk.Entry(window)
         message_entry.pack(fill='x', padx=10, pady=5)
 
-        server_ip = '127.0.0.1'
-        server_port = 9999
+        server_ip = '147.185.221.24'
+        server_port = 3454
         client_socket = connect_to_server(server_ip, server_port, text_area, username, room_name)
 
         send_button = tk.Button(window, text="Send", command=lambda: send_message(client_socket, message_entry, text_area, username, room_name))
@@ -146,8 +146,8 @@ def create_client_gui():
         window.protocol("WM_DELETE_WINDOW", lambda: on_closing(client_socket, window))
 
     # Open room selection window
-    server_ip = '127.0.0.1'
-    server_port = 9999
+    server_ip = '147.185.221.24'
+    server_port = 3454
     choose_room_gui(window, server_ip, server_port, u_id, username, start_chat_in_room)
 
     window.mainloop()
