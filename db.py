@@ -297,6 +297,7 @@ connection = check_database_connection()
 # print(str)
 # create_user(connection,2, 102, 'Doe')
 # create_group(connection,103,'LD',0)
-# delete_group(connection,106,'Dark_room')
+# delete_group(connection,103,'game')
+# delete_group(connection,104,'CS')
 # entry_message(connection, 'Roy', "Hello, this is a test message!", 103)
 
