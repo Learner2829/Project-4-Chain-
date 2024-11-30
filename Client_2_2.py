@@ -27,18 +27,21 @@ def choose_room_gui(window, server_ip, server_port, u_id, u_name, callback):
 def fetch_room_list(server_ip, server_port, u_id, u_name, window):
     room_list = []
     try:
-        # Create a temporary socket to fetch room list
-        temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        temp_socket.connect((server_ip, server_port))
-        
-        # Send user information and request for room list
-        request_message = f"FETCH_ROOM_LIST|{u_id}|{u_name}"
-        temp_socket.send(request_message.encode('utf-8'))
-        
-        # Receive the room list from the server
-        room_data = temp_socket.recv(1024).decode('utf-8')
-        room_list = room_data.split('|')  # Assuming server sends rooms separated by '|'
-        temp_socket.close()
+            
+        with TorClient() as tor_client:
+            with tor_client as session:
+                # Create a temporary socket to fetch room list
+                temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                temp_socket.connect((server_ip, server_port))
+                
+                # Send user information and request for room list
+                request_message = f"FETCH_ROOM_LIST|{u_id}|{u_name}"
+                temp_socket.send(request_message.encode('utf-8'))
+                
+                # Receive the room list from the server
+                room_data = temp_socket.recv(1024).decode('utf-8')
+                room_list = room_data.split('|')  # Assuming server sends rooms separated by '|'
+                temp_socket.close()
     except Exception as e:
         messagebox.showerror("Error", "The server is offline or not reachable.")
         window.destroy()  # Exit the application
@@ -125,7 +128,7 @@ def connect_to_server(server_ip, server_port, text_area, username, room_name):
         
         # Use Torpy to connect via the Tor network
         with TorClient() as tor_client:
-            with tor_client.create_session() as session:
+            with tor_client as session:
                 # Create a socket to connect to the server via the Tor network (SOCKS5 proxy at 127.0.0.1:9050)
                 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -146,7 +149,8 @@ def connect_to_server(server_ip, server_port, text_area, username, room_name):
                 return client_socket
 
     except Exception as e:
-        messagebox.showerror("Connection Error", "Could not connect to the server via Tor.")
+        # messagebox.showerror("Connection Error", "Could not connect to the server via Tor.")
+        messagebox.showerror("E", e)
         return None
 
 def toggle_theme(window, text_area, message_entry, current_theme):
@@ -174,8 +178,8 @@ def create_client_gui():
     current_theme = ['light']
 
     # Define server details
-    server_ip = "147.185.221.24"  # Example server IP
-    server_port = 11199  # Example server port
+    server_ip = "147.185.221.19"
+    server_port = 17077
 
     # Generate random user ID and get username
     u_id = str(uuid.uuid4())  # Automatically allocate a random user ID
